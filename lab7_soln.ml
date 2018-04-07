@@ -373,7 +373,30 @@ let s_list = [new rect (1., 1.) 4.0 5.0;
               new circle (0., -4.) 10.;
               new square (-3., -2.5) 4.3] ;;
 
-# 393
+(* You might notice that the type reported for this list is "rect
+list". Why is that, especially since not all the elements of the list
+are rectangles, and all elements of a list are supposed to be of the
+same type? The actual type associated with the elements of the list is
+an object type, as described in Real World OCaml
+<https://realworldocaml.org/v1/en/html/objects.html>, in particular,
+something like:
+
+    < area : float; 
+      bounding_box : point * point;
+      center : point; 
+      scale : float -> unit; 
+      translate : point -> unit >
+
+The rect, circle, and square objects are all of this type. But the
+ocaml REPL tries to be helpful in printing a more evocative name for
+the type. By treating the class names as synonyms for the object
+types, the type of the list can be interpreted as a rect list or
+circle list or square list. The REPL uses the class of the first
+element in the list as the type name to use, thus rect list. Had the
+elements been in another order, the type might have been abbreviated
+as circle list or square list. *)
+
+# 416
 (* As you might recall, lists can only contain objects of the same
 type.  Why does the type system not show an error with your answer to
 2D?  What is the type of s_list? *)
@@ -422,13 +445,13 @@ Exercise 3A: Implement the square_rect class which inherits all of its
 methods from its parent.
 ......................................................................*)
 
-# 446
+# 469
 class square_rect (p : point) (s : float) : shape =
   object
     inherit rect p s s
   end ;;
 
-# 452
+# 475
 (*......................................................................
 Exercise 3B: Now, implement a square_center_scale class that inherits
 from square, but *overrides* the scale method so that the center
@@ -437,7 +460,7 @@ place. Hint: First scale, then translate the center to its original
 position.
 ......................................................................*)
 
-# 465
+# 488
 class square_center_scale (p : point) (s : float) : shape =
   object
     inherit square_rect p s as super
@@ -452,15 +475,34 @@ class square_center_scale (p : point) (s : float) : shape =
   end ;;
 
 (* Note the overriding of the scale method. We've marked the method
-   with "method!" instead of just "method". The extra "!" diacritic
-   tells OCaml that this method overrides an inherited method, so that
-   OCaml will generate a warning if there was no inherited method
-   being overridden. It's another example of getting the compiler to
-   help you find bugs. See
-   http://caml.inria.fr/pub/docs/manual-ocaml/extn.html#sec236 for
-   further information. *)
+with "method!" instead of just "method". The extra "!" diacritic tells
+OCaml that this method overrides an inherited method, so that OCaml
+will generate a warning if there was no inherited method being
+overridden. It's another example of getting the compiler to help you
+find bugs. See
+http://caml.inria.fr/pub/docs/manual-ocaml/extn.html#sec236 for
+further information. 
+
+Some in lab were enticed to try to refer to the pos instance
+variable inherited from the square_rect class. But that instance
+variable is not available to be referred to -- either implicitly as
+pos or explicitly as this#pos or super#pos -- because the class type
+of the superclass square_rect, shape, does not reveal the pos instance
+variable. Only the five methods specified in the shape class type are
+available to use.
+
+But the very observant might note that in the Lecture 12 slides,
+reference is made to the pos instance variable inherited from a shape
+class. (Slide 49 is an example.) That's because in this example, the
+superclass being inherited from, the shape class, is not itself
+specified as satisfying (and therefore being limited by) the
+display_elt class of the subtype (rect or circle). Thus th subclass
+*is* allowed access to the pos instance variable from the
+superclass. Though this allows brevity in the slides, it is a design
+flaw of the overall system; classes should be explicit about their
+signatures (via class types) to provide a strong abstraction barrier. *)
      
-# 488
+# 530
 (* Before we move on, consider: do you need to make any modifications
 to the area function you wrote in Exercise 2D to support these new
 classes? *)
@@ -526,7 +568,7 @@ that implements a quad class type. Hint: By taking advantage of
 existing classes, you should only need to implement a single method.
 ......................................................................*)
   
-# 560
+# 602
 class rect_quad (p : point) (w : float) (h : float) : quad =
   object
     inherit rect p w h as super
@@ -542,20 +584,20 @@ class rect_quad (p : point) (w : float) (h : float) : quad =
 late binding, we could just as well have referred to
 this#bounding_box, which ends up referring to the same method. *)
 
-# 576
+# 618
 (*......................................................................
 Exercise 4B: Complete a class, square_quad, that represents a square
 that implements a quad class type. Hint: you shouldn't need to
 implement any methods!
 ......................................................................*)
 
-# 589
+# 631
 class square_quad (p : point) (s : float) : quad =
   object
     inherit rect_quad p s s
   end ;;
 
-# 595
+# 637
 (* Remember Exercise 2D, in which you implemented an area function for
 shapes? Amazingly, even though we have continued to create new shapes,
 due to subtyping and inheritance we can still rely on the existing
@@ -567,12 +609,20 @@ pass it to the area function to find out its area and store the result
 in a variable "a".
 ......................................................................*)
    
-# 613
+# 655
 let sq : quad = new square_quad (3., 4.) 5. ;;
 
 let a = area (sq :> shape) ;;
 
-# 618
+(* The natural inclination is to write
+
+    let a = area sq ;;
+
+But this fails to type, since OCaml does not perform type inference
+for object subtypes. Instead, we must be explicit about the subtype to
+supertype (quad to shape) coercion by using the :> operator. *)
+
+# 668
 (*......................................................................
 Exercise 4D: Write a function, area_list, that accepts a list of
 shapes and returns a list of areas.
@@ -580,10 +630,10 @@ shapes and returns a list of areas.
    
 let area_list (lst : shape list) : float list =
   
-# 627
+# 677
   List.map area lst ;;
 
-# 630
+# 680
 (* This works because of *dynamic dispatch*; we decide the code to run
 at run-time instead of compile-time. In other words, the shape#area
 call in the area function determines at run-time the specific method
